@@ -23,6 +23,10 @@ module "example_app_with_two_images" {
 }
 ```
 
+This will create ECR repositories, IAM users & policies for your application and
+CI to use. It's up to you to create the actual infrastructure & backing services
+that your application will run on.
+
 ## Deployment Model
 
 Each application will have:

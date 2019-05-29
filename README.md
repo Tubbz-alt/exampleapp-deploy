@@ -4,6 +4,25 @@ This repo provides:
 * a Terraform module to setup your deployment infrastructure
 * an example of how to use it
 
+To use it in your own code, you'll need to reference the Terraform module:
+
+```terraform
+module "example_app_with_two_images" {
+  source              = "https://github.com/communitiesuk/exampleapp-deploy/modules/application_with_ecr"
+  name                = "Name of your application"
+  # The identifier should be a UNIQUE, short reference (usually an abbreviation)
+  # for this application. It might correspond to a prefix in JIRA, for example.
+  identifier          = "EXAPP2ECR"
+  business_unit       = "Digital Delivery"
+  budget_holder_email = "your.budget.holder@communities.gov.uk"
+  tech_contact_email  = "probably.your.team.email@communities.gov.uk"
+  stage               = "dev|staging|production"
+  # You can define as many ECR repositories as your application will need.
+  # An ECR repository will be created for each entry in this list
+  ecr_repo_names      = ["frontend", "backend"]
+}
+```
+
 ## Deployment Model
 
 Each application will have:

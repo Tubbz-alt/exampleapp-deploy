@@ -9,6 +9,12 @@ To use it in your own code, you'll need to reference the Terraform module:
 ```terraform
 module "example_app_with_two_images" {
   source              = "https://github.com/communitiesuk/exampleapp-deploy/modules/application_with_ecr"
+  # You can define as many ECR repositories as your application will need.
+  # An ECR repository will be created for each entry in this list
+  ecr_repo_names      = ["frontend", "backend"]
+
+  # The rest of these parameters are used to tag the created infrastructure
+  # for cost-allocation. It's important that you provide meaningful values.
   name                = "Name of your application"
   # The identifier should be a UNIQUE, short reference (usually an abbreviation)
   # for this application. It might correspond to a prefix in JIRA, for example.
@@ -17,15 +23,56 @@ module "example_app_with_two_images" {
   budget_holder_email = "your.budget.holder@communities.gov.uk"
   tech_contact_email  = "probably.your.team.email@communities.gov.uk"
   stage               = "dev|staging|production"
-  # You can define as many ECR repositories as your application will need.
-  # An ECR repository will be created for each entry in this list
-  ecr_repo_names      = ["frontend", "backend"]
 }
 ```
 
 This will create ECR repositories, IAM users & policies for your application and
-CI to use. It's up to you to create the actual infrastructure & backing services
+CI to use.
+
+It's up to you to create the actual infrastructure & backing services
 that your application will run on.
+
+PLEASE NOTE you should use the same cost-allocation tags for all of your infrastructure. For instance, tag all EC2 instances like this:
+
+```terraform
+resource "aws_instance" "my-test-instance" {
+  ami             = "(some AMI id)"
+  instance_type   = "t2.micro"
+
+  tags {
+    application-name        = "Name of your application"
+    application-identifier  = "EXAPP2ECR"
+    business-unit           = "Digital Delivery"
+    budget-holder-email     = "your.budget.holder@communities.gov.uk"
+    tech-contact-email      = "probably.your.team.email@communities.gov.uk"
+    stage                   = "dev|staging|production"
+  }
+}
+```
+
+To save duplication, you can define your standard tags as a `local` map, like this:
+```terraform
+
+locals {
+  standard_tags = {
+    application-name        = "Name of your application"
+    application-identifier  = "EXAPP2ECR"
+    business-unit           = "Digital Delivery"
+    budget-holder-email     = "your.budget.holder@communities.gov.uk"
+    tech-contact-email      = "probably.your.team.email@communities.gov.uk"
+    stage                   = "dev|staging|production"
+  }
+}
+```
+and then _most_ (not all, sadly) AWS resources allow you to pass them as a single map:
+```terraform
+resource "aws_instance" "my-test-instance" {
+  ami             = "(some AMI id)"
+  instance_type   = "t2.micro"
+
+  tags = "${local.standard_tags}"
+}
+```
 
 ## Deployment Model
 

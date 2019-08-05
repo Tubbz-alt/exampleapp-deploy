@@ -32,6 +32,8 @@ CI to use.
 It's up to you to create the actual infrastructure & backing services
 that your application will run on.
 
+## Tagging Resources
+
 PLEASE NOTE you should use the same cost-allocation tags for all of your infrastructure. For instance, tag all EC2 instances like this:
 
 ```terraform

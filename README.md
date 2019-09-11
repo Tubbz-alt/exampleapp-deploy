@@ -8,7 +8,7 @@ To use it in your own code, you'll need to reference the Terraform module:
 
 ```terraform
 module "example_app_with_two_images" {
-  source              = "https://github.com/communitiesuk/exampleapp-deploy/terraform/modules/application_with_ecr"
+  source              = "github.com/communitiesuk/exampleapp-deploy/terraform/modules/application_with_ecr"
   # You can define as many ECR repositories as your application will need.
   # An ECR repository will be created for each entry in this list
   ecr_repo_names      = ["frontend", "backend"]

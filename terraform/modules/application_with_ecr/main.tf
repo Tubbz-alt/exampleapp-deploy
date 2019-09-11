@@ -139,9 +139,8 @@ output "ecr_repo_arns" {
 output "ecr_repo_urls" {
   description = <<HEREDOC
 Use these URLs to push/pull container images for your application.
-The current user ("${data.aws_caller_identity.current.user_id}") has full
-control over these repositories. I will also grant push/pull/list/describe
-permission to the C.I. IAM user ${aws_iam_user.application_ci_user.name}
+The current user has full control over these repositories. I will 
+also grant push/pull/list/describe permission to the C.I. IAM user
 HEREDOC
 
   value = ["${aws_ecr_repository.ecr_repositories_list.*.repository_url}"]

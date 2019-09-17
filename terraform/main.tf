@@ -15,12 +15,11 @@ output "ecr_repo_arns" {
 
 output "ecr_repo_urls" {
   description = "Push container images to these URLs"
-  value = "${module.example_app_with_two_images.ecr_repo_urls}"
+  value       = "${module.example_app_with_two_images.ecr_repo_urls}"
 }
 
 output "application_iam_role_arn" {
-  "
-  value       = "${module.example_app_with_two_images.application_iam_role_arn}"
+  value = "${module.example_app_with_two_images.application_iam_role_arn}"
 }
 
 output "application_iam_role_name" {

@@ -252,3 +252,7 @@ output "alb_dns_name" {
 output "aws_ecs_service_id" {
   value = aws_ecs_service.thisapp_service.id
 }
+
+output "ecs_tasks_sg_id" {
+  value = aws_security_group.ecs_tasks.id
+}

@@ -20,8 +20,14 @@ variable "task_cpu" {
 variable "task_memory" {
   default = "0.5GB"
 }
-variable "health_check_path" {
+variable "alb_health_check_path" {
   default = "/"
+}
+variable "alb_health_check_interval" {
+  default = 60
+}
+variable "alb_healthy_threshold" {
+  default = 3
 }
 variable "autoscale_min_capacity" {
   default = 1
@@ -102,13 +108,13 @@ resource "aws_alb_target_group" "app" {
   target_type = "ip"
 
   health_check {
-    healthy_threshold   = "3"
-    interval            = "30"
+    healthy_threshold   = var.alb_healthy_threshold
+    interval            = var.alb_health_check_interval
     protocol            = "HTTP"
     matcher             = "200"
-    timeout             = "3"
-    path                = var.health_check_path
-    unhealthy_threshold = "2"
+    timeout             = "10"
+    path                = var.alb_health_check_path
+    unhealthy_threshold = var.alb_unhealthy_threshold
   }
 }
 

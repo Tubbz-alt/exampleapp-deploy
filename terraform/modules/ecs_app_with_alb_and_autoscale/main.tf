@@ -10,6 +10,10 @@ variable "alb_external_port" {}
 variable "container_name" {}
 variable "container_port" {}
 variable "container_definitions" {}
+variable "container_security_group_ids" {
+  type    = list
+  default = []
+}
 variable "task_cpu" {
   default = "256"
 }
@@ -26,7 +30,12 @@ variable "autoscale_max_capacity" {
   default = 6
 }
 variable "tags" {
-  type = map
+  description = <<-ENDDESC
+NOTE if you get errors saying the new ARN format must be enabled to add tags,
+run this command from the console:
+aws ecs put-account-setting-default --name serviceLongArnFormat --value enabled --region (your region)
+ENDDESC
+  type        = map
 }
 
 # Security groups to limit access to our ALB and ECS tasks
@@ -234,7 +243,7 @@ resource "aws_ecs_service" "thisapp_service" {
   tags            = var.tags
 
   network_configuration {
-    security_groups = [aws_security_group.ecs_tasks.id]
+    security_groups = concat([aws_security_group.ecs_tasks.id], var.container_security_group_ids)
     subnets         = var.private_subnet_ids
   }
 

@@ -29,6 +29,9 @@ variable "alb_health_check_interval" {
 variable "alb_healthy_threshold" {
   default = 3
 }
+variable "alb_unhealthy_threshold" {
+  default = 3
+}
 variable "autoscale_min_capacity" {
   default = 1
 }

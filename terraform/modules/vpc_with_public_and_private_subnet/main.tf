@@ -55,50 +55,114 @@ resource "aws_internet_gateway" "gw" {
   tags   = var.tags
 }
 
-# Route the public subnet trafic through the IGW
-resource "aws_route" "internet_access" {
-  route_table_id         = "${aws_vpc.main.main_route_table_id}"
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = "${aws_internet_gateway.gw.id}"
-}
 
-# Create a NAT gateway with an EIP for each private subnet to get internet connectivity
-resource "aws_eip" "gw" {
+
+resource "aws_eip" "nat_eip" {
   count      = "${var.az_count}"
   vpc        = true
   depends_on = ["aws_internet_gateway.gw"]
   tags       = var.tags
 }
 
-resource "aws_nat_gateway" "gw" {
-  count         = "${var.az_count}"
-  subnet_id     = "${element(aws_subnet.public.*.id, count.index)}"
-  allocation_id = "${element(aws_eip.gw.*.id, count.index)}"
+# Create a NAT gateway with an EIP for each private subnet to get internet connectivity
+#
+# resource "aws_nat_gateway" "gw" {
+#   count         = "${var.az_count}"
+#   subnet_id     = "${element(aws_subnet.public.*.id, count.index)}"
+#   allocation_id = "${element(aws_eip.gw.*.id, count.index)}"
+#   tags          = var.tags
+# }
+
+
+data "aws_ami" "nat_ami" {
+  most_recent = true
+  owners      = ["amazon"]
+  name_regex  = "amzn-ami-vpc-nat.*"
+}
+
+resource "aws_instance" "nat" {
+  count         = var.az_count
+  ami           = "${data.aws_ami.nat_ami.id}"
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.public[count.index].id
   tags          = var.tags
 }
 
-# Create a new route table for the private subnets, make it route non-local
-# traffic through the NAT gateway to the internet
-resource "aws_route_table" "private" {
-  count  = "${var.az_count}"
-  vpc_id = "${aws_vpc.main.id}"
+resource "aws_security_group" "nat_sg" {
+  count = var.az_count
+  name  = "nat-instance-sg-${aws_instance.nat[count.index].id}"
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = "${element(aws_nat_gateway.gw.*.id, count.index)}"
+  ingress {
+    protocol    = "tcp"
+    from_port   = 80
+    to_port     = 80
+    cidr_blocks = [aws_subnet.private[count.index].cidr_block]
   }
+  ingress {
+    protocol    = "tcp"
+    from_port   = 443
+    to_port     = 443
+    cidr_blocks = [aws_subnet.private[count.index].cidr_block]
+  }
+  egress {
+    protocol    = "tcp"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+
+  }
+  tags = var.tags
+}
+
+# Create a new route table for the private subnets, the nat_instance module will
+# add a route to make it route non-local traffic through the NAT gateway to the
+# internet
+resource "aws_route_table" "public_subnet_rt" {
+  count  = var.az_count
+  vpc_id = aws_vpc.main.id
 
   tags = var.tags
 }
 
-# Explicitly associate the newly created route tables to the private subnets
-# (so they don't default to the main route table)
-resource "aws_route_table_association" "private" {
-  count          = "${var.az_count}"
-  subnet_id      = "${element(aws_subnet.private.*.id, count.index)}"
-  route_table_id = "${element(aws_route_table.private.*.id, count.index)}"
+# Route the public subnet's traffic through the IGW by default
+resource "aws_route" "internet_access" {
+  count                  = var.az_count
+  route_table_id         = aws_route_table.public_subnet_rt[count.index].id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.gw.id
 }
 
+# Explicitly associate the newly created route tables to the public subnets
+# (so they don't default to the main route table)
+resource "aws_route_table_association" "public_subnet_rta" {
+  count          = var.az_count
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public_subnet_rt[count.index].id
+}
+
+
+resource "aws_route_table" "private_subnet_rt" {
+  count  = var.az_count
+  vpc_id = aws_vpc.main.id
+
+  tags = var.tags
+}
+
+# Route the private subnet's traffic through the NAT instance by default
+resource "aws_route" "default_to_nat_instance" {
+  count                  = var.az_count
+  route_table_id         = aws_route_table.private_subnet_rt[count.index].id
+  destination_cidr_block = "0.0.0.0/0"
+  instance_id            = aws_instance.nat[count.index].id
+}
+
+# Explicitly associate the newly created route tables to the private subnets
+# (so they don't default to the main route table)
+resource "aws_route_table_association" "private_subnet_rta" {
+  count          = var.az_count
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private_subnet_rt[count.index].id
+}
 
 output "vpc_id" {
   value = aws_vpc.main.id
@@ -121,9 +185,13 @@ output "private_subnet_cidr_blocks" {
 output "internet_gateway_id" {
   value = aws_internet_gateway.gw.id
 }
-output "route_table_ids" {
-  value = aws_route_table.private.*.id
+output "private_route_table_ids" {
+  value = aws_route_table.private_subnet_rt.*.id
 }
-output "nat_gateway_ids" {
-  value = aws_nat_gateway.gw.*.id
+
+output "public_route_table_ids" {
+  value = aws_route_table.public_subnet_rt.*.id
+}
+output "nat_instance_ids" {
+  value = aws_instance.nat.*.id
 }

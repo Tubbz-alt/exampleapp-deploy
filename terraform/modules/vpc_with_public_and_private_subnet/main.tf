@@ -62,16 +62,9 @@ resource "aws_route" "internet_access" {
   gateway_id             = "${aws_internet_gateway.gw.id}"
 }
 
-# Create a NAT instance with an EIP for each private subnet to get internet
+# Create a NAT instance for each private subnet to get internet
 # connectivity. Explicit dependence on the IGW to make sure that gets created
 # first, so that anything else gets connectivity ASAP.
-resource "aws_eip" "gw" {
-  count      = "${var.az_count}"
-  vpc        = true
-  depends_on = ["aws_internet_gateway.gw"]
-  tags       = var.tags
-}
-
 
 resource "aws_security_group" "nat" {
   name        = "vpc_nat"

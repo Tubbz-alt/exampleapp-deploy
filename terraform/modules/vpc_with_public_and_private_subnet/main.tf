@@ -62,7 +62,9 @@ resource "aws_route" "internet_access" {
   gateway_id             = "${aws_internet_gateway.gw.id}"
 }
 
-# Create a NAT gateway with an EIP for each private subnet to get internet connectivity
+# Create a NAT instance with an EIP for each private subnet to get internet
+# connectivity. Explicit dependence on the IGW to make sure that gets created
+# first, so that anything else gets connectivity ASAP.
 resource "aws_eip" "gw" {
   count      = "${var.az_count}"
   vpc        = true
@@ -70,22 +72,97 @@ resource "aws_eip" "gw" {
   tags       = var.tags
 }
 
-resource "aws_nat_gateway" "gw" {
-  count         = "${var.az_count}"
-  subnet_id     = "${element(aws_subnet.public.*.id, count.index)}"
-  allocation_id = "${element(aws_eip.gw.*.id, count.index)}"
-  tags          = var.tags
+
+resource "aws_security_group" "nat" {
+  name        = "vpc_nat"
+  description = "Allow traffic to pass from the private subnet to the internet"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = aws_subnet.private.*.cidr_block
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = aws_subnet.private.*.cidr_block
+  }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = -1
+    to_port     = -1
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+  egress {
+    from_port   = -1
+    to_port     = -1
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(var.tags, {
+    Name = "NATSG"
+  })
+}
+
+data "aws_ami" "nat_instance" {
+  most_recent = true
+  owners      = ["amazon"]
+  name_regex  = ".*amzn-ami-vpc-nat.*"
+}
+
+resource "aws_instance" "nat" {
+  count             = var.az_count
+  ami               = data.aws_ami.nat_instance.id
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+  instance_type     = "t2.micro"
+  #key_name                    = "${var.aws_key_name}"
+  vpc_security_group_ids      = [aws_security_group.nat.id]
+  subnet_id                   = aws_subnet.public[count.index].id
+  associate_public_ip_address = true
+  source_dest_check           = false
+
+  tags = merge(var.tags, { "Name" : "NAT instance" })
 }
 
 # Create a new route table for the private subnets, make it route non-local
-# traffic through the NAT gateway to the internet
+# traffic through the NAT instance to the internet
 resource "aws_route_table" "private" {
   count  = "${var.az_count}"
   vpc_id = "${aws_vpc.main.id}"
 
   route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = "${element(aws_nat_gateway.gw.*.id, count.index)}"
+    cidr_block  = "0.0.0.0/0"
+    instance_id = aws_instance.nat[count.index].id
   }
 
   tags = var.tags
@@ -124,6 +201,6 @@ output "internet_gateway_id" {
 output "route_table_ids" {
   value = aws_route_table.private.*.id
 }
-output "nat_gateway_ids" {
-  value = aws_nat_gateway.gw.*.id
+output "nat_instance_ids" {
+  value = aws_instance.nat.*.id
 }

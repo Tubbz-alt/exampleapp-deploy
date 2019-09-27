@@ -97,3 +97,45 @@ Your CI service can therefore generate & execute a docker login like this:
 $(AWS_PROFILE=(profile name) aws ecr get-login --region eu-west-2 --no-include-email)
 ```
 ...and then `docker push` as normal.
+
+# Re-usable Modules
+You can use the modules in this repo directly as components of your own infrastructure.
+
+## VPC With Public And Private Subnets
+
+Creates standard Well-Architected VPC setup across a specified number of AZs,
+with a shared Internet Gateway that allows the contained infrastructure to get
+out to the internet.
+Each AZ has a public subnet, a private subnet, a NAT instance (much cheaper
+than a NAT Gateway) with an appropriate security group, and routing tables
+with appropriate rules.
+
+Example usage:
+```terraform
+module "vpc_with_public_and_private_subnets" {
+  source = "github.com/communitiesuk/exampleapp-deploy/terraform/modules/vpc_with_public_and_private_subnet"
+  tags   = local.standard_tags
+}
+```
+
+### Inputs
+
+*tags*
+A map of tags to apply to all infrastructure
+Default: {}
+
+*vpc_cidr_block*
+A CIDR block describing the IP address range the VPC will use
+Default: "10.0.0.0/16"
+
+*az_count*
+The number of AZs you want to create subnets in
+Default: 2
+
+*private_subnet_size*
+The number of bits you want to extend the VPC CIDR block by, for your private subnets
+Default: 8
+
+*public_subnet_size*
+The number of bits you want to extend the VPC CIDR block by, for your private subnets
+Default: 8
